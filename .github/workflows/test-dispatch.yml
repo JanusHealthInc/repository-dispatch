@@ -2,16 +2,34 @@ name: Test Dispatch
 on: workflow_dispatch
 
 permissions:
-  pull-requests: write
   contents: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Test repository dispatch
-        uses: peter-evans/repository-dispatch@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          # token: ${{ secrets.PUBLIC_REPO_SCOPED_TOKEN }}
+          node-version-file: package.json
+      - run: npm ci
+      - run: npm run build
+      - run: git diff --exit-code -- dist/index.js
+      - run: npm run format-check
+      - run: npm run lint
+      - run: npm test -- --runInBand
+
+      # Use the same immutable revision as the consumer workflows.
+      - name: Test repository dispatch
+        uses: JanusHealthInc/repository-dispatch@e94e792f234fab3190a5da59fe5d61d7026af9c6
+        with:
+          repository: ${{ github.repository }}
           event-type: tests
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
+      - name: Test repository dispatch with default payload
+        uses: JanusHealthInc/repository-dispatch@e94e792f234fab3190a5da59fe5d61d7026af9c6
+        with:
+          repository: ${{ github.repository }}
+          event-type: tests
